@@ -64,6 +64,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+
 public final class USBMonitor {
 
 	private static final boolean DEBUG = false;	// TODO set false on production
