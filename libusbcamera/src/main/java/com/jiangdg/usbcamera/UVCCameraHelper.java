@@ -25,7 +25,6 @@ import java.util.Objects;
  *
  * Created by jiangdongguo on 2017/9/30.
  */
-
 public class UVCCameraHelper {
     public static final String ROOT_PATH = Environment.getExternalStorageDirectory().getAbsolutePath()
             + File.separator;
@@ -57,6 +56,7 @@ public class UVCCameraHelper {
     }
 
     public static UVCCameraHelper getInstance() {
+        Log.d("HANDLER","GET INSTANCE");
         if (mCameraHelper == null) {
             mCameraHelper = new UVCCameraHelper();
         }
@@ -102,13 +102,19 @@ public class UVCCameraHelper {
                     listener.onDettachDev(device);
                 }
             }
-
             // called by connect to usb camera
-            // do open camera,start previewing
+// do open camera,start previewing
             @Override
             public void onConnect(final UsbDevice device, USBMonitor.UsbControlBlock ctrlBlock, boolean createNew) {
+                Log.d("USB_CONNECT", "onConnect: Device connected");
+                Log.d("USB_CONNECT", "onConnect: UsbDevice - " + device);
+                Log.d("USB_CONNECT", "onConnect: UsbControlBlock - " + ctrlBlock);
+
                 mCtrlBlock = ctrlBlock;
+                Log.d("USB_CONNECT", "onConnect: Opening camera with ctrlBlock");
+
                 openCamera(ctrlBlock);
+
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
@@ -116,16 +122,52 @@ public class UVCCameraHelper {
                         try {
                             Thread.sleep(500);
                         } catch (InterruptedException e) {
-                            e.printStackTrace();
+                            Log.e("USB_CONNECT", "onConnect: Interrupted while waiting for camera creation", e);
                         }
+
+                        Log.d("USB_CONNECT", "onConnect: Starting preview with mCamView - " + mCamView);
+                        if (mCamView == null) {
+                            Log.e("USB_CONNECT", "onConnect: mCamView is null, cannot start preview");
+                            return;
+                        }
+
                         // start previewing
                         startPreview(mCamView);
+
+                        Log.d("USB_CONNECT", "onConnect: Preview started");
                     }
                 }).start();
+
                 if(listener != null) {
-                    listener.onConnectDev(device,true);
+                    Log.d("USB_CONNECT", "onConnect: Notifying listener about connection");
+                    listener.onConnectDev(device, true);
+                } else {
+                    Log.d("USB_CONNECT", "onConnect: Listener is null, cannot notify about connection");
                 }
             }
+//            // called by connect to usb camera
+//            // do open camera,start previewing
+//            @Override
+//            public void onConnect(final UsbDevice device, USBMonitor.UsbControlBlock ctrlBlock, boolean createNew) {
+//                mCtrlBlock = ctrlBlock;
+//                openCamera(ctrlBlock);
+//                new Thread(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        // wait for camera created
+//                        try {
+//                            Thread.sleep(500);
+//                        } catch (InterruptedException e) {
+//                            e.printStackTrace();
+//                        }
+//                        // start previewing
+//                        startPreview(mCamView);
+//                    }
+//                }).start();
+//                if(listener != null) {
+//                    listener.onConnectDev(device,true);
+//                }
+//            }
 
             // called by disconnect to usb camera
             // do nothing
@@ -145,19 +187,56 @@ public class UVCCameraHelper {
     }
 
     public void createUVCCamera() {
-        if (mCamView == null)
+        Log.d("createUVCCamera", "Entering createUVCCamera method");
+
+        if (mCamView == null) {
             throw new NullPointerException("CameraViewInterface cannot be null!");
+        }
 
         // release resources for initializing camera handler
         if (mCameraHandler != null) {
+            Log.d("createUVCCamera", "Releasing existing CameraHandler");
             mCameraHandler.release();
             mCameraHandler = null;
         }
+
         // initialize camera handler
-        mCamView.setAspectRatio(previewWidth / (float)previewHeight);
+        Log.d("createUVCCamera", "Initializing new CameraHandler");
+        mCamView.setAspectRatio(previewWidth / (float) previewHeight);
+
+        Log.d("createUVCCamera", "Creating CameraHandler with parameters - Activity: " + mActivity
+                + ", CameraViewInterface: " + mCamView + ", PreviewWidth: " + previewWidth
+                + ", PreviewHeight: " + previewHeight + ", FrameFormat: " + mFrameFormat);
+
         mCameraHandler = UVCCameraHandler.createHandler(mActivity, mCamView, 2,
                 previewWidth, previewHeight, mFrameFormat);
+
+        if (mCameraHandler != null) {
+            Log.d("createUVCCamera", "CameraHandler created successfully: " + mCameraHandler);
+        } else {
+            Log.e("createUVCCamera", "Failed to create CameraHandler");
+        }
+
+        Log.d("createUVCCamera", "Exiting createUVCCamera method");
     }
+
+
+//    public void createUVCCamera() {
+//        if (mCamView == null)
+//            throw new NullPointerException("CameraViewInterface cannot be null!");
+//
+//        // release resources for initializing camera handler
+//        if (mCameraHandler != null) {
+//            mCameraHandler.release();
+//            mCameraHandler = null;
+//        }
+//        // initialize camera handler
+//        Log.d("create","CREATE HANDLER");
+//        mCamView.setAspectRatio(previewWidth / (float)previewHeight);
+//        mCameraHandler = UVCCameraHandler.createHandler(mActivity, mCamView, 2,
+//                previewWidth, previewHeight, mFrameFormat);
+//        Log.d("HANDLER","Created $",mCameraHandler);
+//    }
 
     public void updateResolution(int width, int height) {
         if (previewWidth == width && previewHeight == height) {
@@ -217,15 +296,29 @@ public class UVCCameraHelper {
     }
 
     public void requestPermission(int index) {
+        Log.d("USB_DEBUG", "requestPermission called with index: " + index);
+
         List<UsbDevice> devList = getUsbDeviceList();
+        Log.d("USB_DEBUG", "Device list retrieved: " + (devList == null ? "null" : devList.toString()));
+
         if (devList == null || devList.size() == 0) {
+            Log.d("USB_DEBUG", "No USB devices found or device list is null");
             return;
         }
+
         int count = devList.size();
-        if (index >= count)
-            new IllegalArgumentException("index illegal,should be < devList.size()");
+        Log.d("USB_DEBUG", "Number of USB devices found: " + count);
+
+        if (index >= count) {
+            Log.e("USB_DEBUG", "Illegal argument: index should be less than devList.size()");
+            throw new IllegalArgumentException("index illegal, should be < devList.size()");
+        }
+
         if (mUSBMonitor != null) {
-            mUSBMonitor.requestPermission(getUsbDeviceList().get(index));
+            Log.d("USB_DEBUG", "USB Monitor is not null, requesting permission for device: " + devList.get(index));
+            mUSBMonitor.requestPermission(devList.get(index));
+        } else {
+            Log.d("USB_DEBUG", "USB Monitor is null, cannot request permission");
         }
     }
 
@@ -254,13 +347,13 @@ public class UVCCameraHelper {
             if(! Objects.requireNonNull(file.getParentFile()).exists()) {
                 file.getParentFile().mkdirs();
             }
-            mCameraHandler.captureStill(savePath,listener);
+            mCameraHandler.captureStill(savePath, (AbstractUVCCameraHandler.OnCaptureListener) listener);
         }
     }
 
     public void startPusher(AbstractUVCCameraHandler.OnEncodeResultListener listener) {
         if (mCameraHandler != null && !isPushing()) {
-            mCameraHandler.startRecording(null, listener);
+            mCameraHandler.startRecording((RecordParams) null, (AbstractUVCCameraHandler.OnEncodeResultListener) listener);
         }
     }
 
@@ -269,7 +362,7 @@ public class UVCCameraHelper {
             if(params.isSupportOverlay()) {
                 TxtOverlay.install(mActivity.getApplicationContext());
             }
-            mCameraHandler.startRecording(params, listener);
+            mCameraHandler.startRecording(params, (AbstractUVCCameraHandler.OnEncodeResultListener) listener);
         }
     }
 
@@ -310,7 +403,7 @@ public class UVCCameraHelper {
 
     public void setOnPreviewFrameListener(AbstractUVCCameraHandler.OnPreViewResultListener listener) {
         if(mCameraHandler != null) {
-            mCameraHandler.setOnPreViewResultListener(listener);
+            mCameraHandler.setOnPreViewResultListener((AbstractUVCCameraHandler.OnPreViewResultListener) listener);
         }
     }
 
@@ -321,13 +414,32 @@ public class UVCCameraHelper {
     }
 
     public void startPreview(CameraViewInterface cameraView) {
+        Log.d("START_PREVIEW", "START PREVIEW");
+        if (cameraView == null) {
+            Log.e("START_PREVIEW", "START PREVIEW: cameraView is null!");
+            return;
+        }
+
+        Log.d("START_PREVIEW", "START PREVIEW: cameraView class - " + cameraView.getClass().getName());
+
         SurfaceTexture st = cameraView.getSurfaceTexture();
+        if (st == null) {
+            Log.e("START_PREVIEW", "START PREVIEW: SurfaceTexture is null!");
+        } else {
+            Log.d("START_PREVIEW", "START PREVIEW: SurfaceTexture is not null");
+        }
+
         if (mCameraHandler != null) {
+            Log.d("START_PREVIEW", "START PREVIEW HANDLER NOT NULL");
             mCameraHandler.startPreview(st);
+        } else {
+            Log.e("START_PREVIEW", "START PREVIEW HANDLER IS NULL");
         }
     }
 
+
     public void stopPreview() {
+        Log.d("STOP_PREVIEW","STOP PREVIEW");
         if (mCameraHandler != null) {
             mCameraHandler.stopPreview();
         }

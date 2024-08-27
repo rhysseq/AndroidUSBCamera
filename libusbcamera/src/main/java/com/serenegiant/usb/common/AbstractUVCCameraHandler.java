@@ -54,7 +54,6 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
-
 /**
  * Camera业务处理抽象类
  */
@@ -62,6 +61,8 @@ public abstract class AbstractUVCCameraHandler extends Handler {
 
     private static final boolean DEBUG = true;    // TODO set false on release
     private static final String TAG = "AbsUVCCameraHandler";
+
+//    public abstract void open(com.uvccamera.USBMonitor.UsbControlBlock ctrlBlock);
 
 
     // 对外回调接口
@@ -191,16 +192,30 @@ public abstract class AbstractUVCCameraHandler extends Handler {
         checkReleased();
         throw new UnsupportedOperationException("does not support now");
     }
-
     // 开启Camera预览
     public void startPreview(final Object surface) {
+        Log.d("UVCCameraHandler", "startPreview: Checking if handler is released");
         checkReleased();
+
+        Log.d("UVCCameraHandler", "startPreview: Verifying the surface type");
         if (!((surface instanceof SurfaceHolder) || (surface instanceof Surface) || (surface instanceof SurfaceTexture))) {
+            Log.e("UVCCameraHandler", "startPreview: Invalid surface type. Surface should be one of SurfaceHolder, Surface, or SurfaceTexture. Received: " + surface);
             throw new IllegalArgumentException("surface should be one of SurfaceHolder, Surface or SurfaceTexture: " + surface);
         }
 
+        Log.d("UVCCameraHandler", "startPreview: Sending preview start message with surface: " + surface);
         sendMessage(obtainMessage(MSG_PREVIEW_START, surface));
     }
+//    // 开启Camera预览
+//    public void startPreview(final Object surface) {
+//        checkReleased();
+//
+//        if (!((surface instanceof SurfaceHolder) || (surface instanceof Surface) || (surface instanceof SurfaceTexture))) {
+//            throw new IllegalArgumentException("surface should be one of SurfaceHolder, Surface or SurfaceTexture: " + surface);
+//        }
+//
+//        sendMessage(obtainMessage(MSG_PREVIEW_START, surface));
+//    }
 
     public void setOnPreViewResultListener(OnPreViewResultListener listener) {
         AbstractUVCCameraHandler.mPreviewListener = listener;
@@ -457,17 +472,42 @@ public abstract class AbstractUVCCameraHandler extends Handler {
             super.finalize();
         }
 
-        public AbstractUVCCameraHandler getHandler() {
-            if (DEBUG) Log.v(TAG_THREAD, "getHandler:");
-            synchronized (mSync) {
-                if (mHandler == null)
-                    try {
-                        mSync.wait();
-                    } catch (final InterruptedException e) {
-                    }
+//        public AbstractUVCCameraHandler getHandler() {
+//            if (DEBUG) Log.v(TAG_THREAD, "getHandler:");
+//            synchronized (mSync) {
+//                if (mHandler == null)
+//                    try {
+//                        mSync.wait();
+//                    } catch (final InterruptedException e) {
+//                    }
+//            }
+//            return mHandler;
+//        }
+public AbstractUVCCameraHandler getHandler() {
+    if (DEBUG) Log.v(TAG_THREAD, "getHandler: Entering getHandler method");
+
+    synchronized (mSync) {
+        if (mHandler == null) {
+            if (DEBUG) Log.v(TAG_THREAD, "getHandler: Handler is null, waiting...");
+            try {
+                mSync.wait();
+            } catch (final InterruptedException e) {
+                if (DEBUG) Log.v(TAG_THREAD, "getHandler: InterruptedException occurred while waiting", e);
             }
-            return mHandler;
         }
+
+        if (DEBUG) {
+            if (mHandler != null) {
+                Log.v(TAG_THREAD, "getHandler: Handler created successfully: " + mHandler);
+            } else {
+                Log.v(TAG_THREAD, "getHandler: Handler is still null after wait");
+            }
+        }
+    }
+
+    if (DEBUG) Log.v(TAG_THREAD, "getHandler: Exiting getHandler method");
+    return mHandler;
+}
 
         public int getWidth() {
             synchronized (mSync) {
@@ -509,22 +549,55 @@ public abstract class AbstractUVCCameraHandler extends Handler {
             return (mUVCCamera != null) && (mUVCCamera.getDevice() != null) && mUVCCamera.getDevice().equals(device);
         }
 
-        public void handleOpen(final USBMonitor.UsbControlBlock ctrlBlock) {
-            if (DEBUG) Log.v(TAG_THREAD, "handleOpen:");
-            handleClose();
-            try {
-                final UVCCamera camera = new UVCCamera();
-                camera.open(ctrlBlock);
-                synchronized (mSync) {
-                    mUVCCamera = camera;
-                }
-                callOnOpen();
-            } catch (final Exception e) {
-                callOnError(e);
-            }
-            if (DEBUG)
-                Log.i(TAG, "supportedSize:" + (mUVCCamera != null ? mUVCCamera.getSupportedSize() : null));
+//        public void handleOpen(final USBMonitor.UsbControlBlock ctrlBlock) {
+//            if (DEBUG) Log.v(TAG_THREAD, "handleOpen:");
+//            handleClose();
+//            try {
+//                final UVCCamera camera = new UVCCamera();
+//                camera.open(ctrlBlock);
+//                synchronized (mSync) {
+//                    mUVCCamera = camera;
+//                }
+//                callOnOpen();
+//            } catch (final Exception e) {
+//                callOnError(e);
+//            }
+//            if (DEBUG)
+//                Log.i(TAG, "supportedSize:" + (mUVCCamera != null ? mUVCCamera.getSupportedSize() : null));
+//        }
+public void handleOpen(final USBMonitor.UsbControlBlock ctrlBlock) {
+    if (DEBUG) Log.v(TAG_THREAD, "handleOpen: Entering method");
+
+    handleClose();
+    try {
+        Log.d(TAG_THREAD, "handleOpen: Creating new UVCCamera instance");
+        final UVCCamera camera = new UVCCamera();
+        Log.d(TAG_THREAD, "handleOpen: Opening camera with provided control block");
+////
+//        // Convert the control block
+//        com.serenegiant.usb.USBMonitor.UsbControlBlock serenegiantCtrlBlock =
+//                UsbControlBlockConverter.convert(ctrlBlock, serenegiantMonitor);
+//
+//// Use the converted control block
+//        camera.open(serenegiantCtrlBlock);
+        camera.open(ctrlBlock);
+        synchronized (mSync) {
+            mUVCCamera = camera;
         }
+        Log.d(TAG_THREAD, "handleOpen: Camera opened successfully, notifying listeners");
+        callOnOpen();
+    } catch (final Exception e) {
+        Log.e(TAG_THREAD, "handleOpen: Error opening camera", e);
+        callOnError(e);
+    }
+
+    if (DEBUG) {
+        String supportedSize = (mUVCCamera != null ? mUVCCamera.getSupportedSize() : null);
+        Log.i(TAG, "supportedSize:" + supportedSize);
+    }
+
+    Log.v(TAG_THREAD, "handleOpen: Exiting method");
+}
 
         public void handleClose() {
             if (DEBUG) Log.v(TAG_THREAD, "handleClose:");
@@ -543,36 +616,58 @@ public abstract class AbstractUVCCameraHandler extends Handler {
 
         public void handleStartPreview(final Object surface) {
             if (DEBUG) Log.v(TAG_THREAD, "handleStartPreview:");
-            if ((mUVCCamera == null) || mIsPreviewing) return;
+
+            if (mUVCCamera == null) {
+                Log.e(TAG_THREAD, "handleStartPreview: mUVCCamera is null");
+                return;
+            }
+
+            if (mIsPreviewing) {
+                Log.w(TAG_THREAD, "handleStartPreview: Already previewing");
+                return;
+            }
+
+
+//            if ((mUVCCamera == null) || mIsPreviewing) return;
             try {
+                Log.d(TAG_THREAD, "handleStartPreview: Setting preview size");
                 mUVCCamera.setPreviewSize(mWidth, mHeight, 1, 31, mPreviewMode, mBandwidthFactor);
                 // 获取USB Camera预览数据，使用NV21颜色会失真
                 // 无论使用YUV还是MPEG，setFrameCallback的设置效果一致
-//				mUVCCamera.setFrameCallback(mIFrameCallback, UVCCamera.PIXEL_FORMAT_NV21);
-                mUVCCamera.setFrameCallback(mIFrameCallback, UVCCamera.PIXEL_FORMAT_YUV420SP);
+				mUVCCamera.setFrameCallback(mIFrameCallback, UVCCamera.PIXEL_FORMAT_NV21);
+                // mUVCCamera.setFrameCallback((com.serenegiant.media.IFrameCallback) mIFrameCallback, UVCCamera.PIXEL_FORMAT_YUV420SP);
             } catch (final IllegalArgumentException e) {
+                Log.e(TAG_THREAD, "handleStartPreview: Failed to set preview size with custom mode", e);
                 try {
+                    Log.d(TAG_THREAD, "handleStartPreview: Falling back to default preview mode");
                     // fallback to YUV mode
                     mUVCCamera.setPreviewSize(mWidth, mHeight, 1, 31, UVCCamera.DEFAULT_PREVIEW_MODE, mBandwidthFactor);
                 } catch (final IllegalArgumentException e1) {
+                    Log.e(TAG_THREAD, "handleStartPreview: Failed to set preview size with default mode", e1);
                     callOnError(e1);
                     return;
                 }
             }
             if (surface instanceof SurfaceHolder) {
+                Log.d(TAG_THREAD, "handleStartPreview: Setting SurfaceHolder as preview display");
                 mUVCCamera.setPreviewDisplay((SurfaceHolder) surface);
             }
             if (surface instanceof Surface) {
+                Log.d(TAG_THREAD, "handleStartPreview: Setting Surface as preview display");
                 mUVCCamera.setPreviewDisplay((Surface) surface);
             } else {
+                Log.d(TAG_THREAD, "handleStartPreview: Setting SurfaceTexture as preview display");
                 mUVCCamera.setPreviewTexture((SurfaceTexture) surface);
             }
+            Log.d(TAG_THREAD, "handleStartPreview: Starting preview");
             mUVCCamera.startPreview();
             mUVCCamera.updateCameraParams();
             synchronized (mSync) {
                 mIsPreviewing = true;
             }
+            Log.d(TAG_THREAD, "handleStartPreview: Preview started successfully");
             callOnStartPreview();
+            Log.v(TAG_THREAD, "handleStartPreview: Exiting method");
         }
 
         public void handleStopPreview() {
@@ -1029,42 +1124,91 @@ public abstract class AbstractUVCCameraHandler extends Handler {
 //		    mSoundId = mSoundPool.load(context, R.raw.camera_click, 1);
 //		}
 
+
+
         @Override
         public void run() {
+            if (DEBUG) Log.v(TAG, "run: Starting CameraThread run method");
             Looper.prepare();
             AbstractUVCCameraHandler handler = null;
+
             try {
+                if (DEBUG) Log.v(TAG, "run: Attempting to get constructor for handler class");
                 final Constructor<? extends AbstractUVCCameraHandler> constructor = mHandlerClass.getDeclaredConstructor(CameraThread.class);
+
+                if (DEBUG) Log.v(TAG, "run: Attempting to create new instance of handler");
                 handler = constructor.newInstance(this);
+
             } catch (final NoSuchMethodException e) {
-                Log.w(TAG, e);
+                Log.w(TAG, "run: NoSuchMethodException", e);
             } catch (final IllegalAccessException e) {
-                Log.w(TAG, e);
+                Log.w(TAG, "run: IllegalAccessException", e);
             } catch (final InstantiationException e) {
-                Log.w(TAG, e);
+                Log.w(TAG, "run: InstantiationException", e);
             } catch (final InvocationTargetException e) {
-                Log.w(TAG, e);
+                Log.w(TAG, "run: InvocationTargetException", e);
             }
+
             if (handler != null) {
+                if (DEBUG) Log.v(TAG, "run: Handler created successfully");
                 synchronized (mSync) {
                     mHandler = handler;
                     mSync.notifyAll();
                 }
                 Looper.loop();
-//				if (mSoundPool != null) {
-//					mSoundPool.release();
-//					mSoundPool = null;
-//				}
+
                 if (mHandler != null) {
+                    if (DEBUG) Log.v(TAG, "run: Marking handler as released");
                     mHandler.mReleased = true;
                 }
+            } else {
+                if (DEBUG) Log.v(TAG, "run: Handler creation failed");
             }
+
+            if (DEBUG) Log.v(TAG, "run: Clearing callbacks and finalizing run method");
             mCallbacks.clear();
             synchronized (mSync) {
                 mHandler = null;
                 mSync.notifyAll();
             }
         }
+
+//        @Override
+//        public void run() {
+//            Looper.prepare();
+//            AbstractUVCCameraHandler handler = null;
+//            try {
+//                final Constructor<? extends AbstractUVCCameraHandler> constructor = mHandlerClass.getDeclaredConstructor(CameraThread.class);
+//                handler = constructor.newInstance(this);
+//            } catch (final NoSuchMethodException e) {
+//                Log.w(TAG, e);
+//            } catch (final IllegalAccessException e) {
+//                Log.w(TAG, e);
+//            } catch (final InstantiationException e) {
+//                Log.w(TAG, e);
+//            } catch (final InvocationTargetException e) {
+//                Log.w(TAG, e);
+//            }
+//            if (handler != null) {
+//                synchronized (mSync) {
+//                    mHandler = handler;
+//                    mSync.notifyAll();
+//                }
+//                Looper.loop();
+////				if (mSoundPool != null) {
+////					mSoundPool.release();
+////					mSoundPool = null;
+////				}
+//                if (mHandler != null) {
+//                    mHandler.mReleased = true;
+//                }
+//            }
+//            mCallbacks.clear();
+//            synchronized (mSync) {
+//                mHandler = null;
+//                mSync.notifyAll();
+//            }
+//        }
 
         private void callOnOpen() {
             for (final CameraCallback callback : mCallbacks) {

@@ -102,10 +102,12 @@ public class UVCCameraTextureView extends AspectRatioTextureView    // API >= 14
 
 	@Override
 	public void onSurfaceTextureAvailable(final SurfaceTexture surface, final int width, final int height) {
-		if (DEBUG) Log.i(TAG, "onSurfaceTextureAvailable:" + surface);
+		Log.d(TAG, "onSurfaceTextureAvailable: " + surface);
 		if (mRenderHandler == null) {
+			Log.d(TAG, "onSurfaceTextureAvailable: creating RenderHandler");
 			mRenderHandler = RenderHandler.createHandler(mFpsCounter, surface, width, height);
 		} else {
+			Log.d(TAG, "onSurfaceTextureAvailable: resizing RenderHandler");
 			mRenderHandler.resize(width, height);
 		}
 		mHasSurface = true;
@@ -113,6 +115,19 @@ public class UVCCameraTextureView extends AspectRatioTextureView    // API >= 14
 			mCallback.onSurfaceCreated(this, getSurface());
 		}
 	}
+//	@Override
+//	public void onSurfaceTextureAvailable(final SurfaceTexture surface, final int width, final int height) {
+//		if (DEBUG) Log.i(TAG, "onSurfaceTextureAvailable:" + surface);
+//		if (mRenderHandler == null) {
+//			mRenderHandler = RenderHandler.createHandler(mFpsCounter, surface, width, height);
+//		} else {
+//			mRenderHandler.resize(width, height);
+//		}
+//		mHasSurface = true;
+//		if (mCallback != null) {
+//			mCallback.onSurfaceCreated(this, getSurface());
+//		}
+//	}
 
 	@Override
 	public void onSurfaceTextureSizeChanged(final SurfaceTexture surface, final int width, final int height) {
@@ -185,7 +200,19 @@ public class UVCCameraTextureView extends AspectRatioTextureView    // API >= 14
 
 	@Override
 	public SurfaceTexture getSurfaceTexture() {
-		return mRenderHandler != null ? mRenderHandler.getPreviewTexture() : null;
+		Log.d(TAG, "getSurfaceTexture called");
+		if (mRenderHandler == null) {
+			Log.d(TAG, "getSurfaceTexture: mRenderHandler is null");
+		} else {
+			Log.d(TAG, "getSurfaceTexture: mRenderHandler is not null, calling getPreviewTexture");
+		}
+		SurfaceTexture previewTexture = mRenderHandler != null ? mRenderHandler.getPreviewTexture() : null;
+		if (previewTexture == null) {
+			Log.d(TAG, "getSurfaceTexture: previewTexture is null");
+		} else {
+			Log.d(TAG, "getSurfaceTexture: previewTexture is not null");
+		}
+		return previewTexture;
 	}
 
 	private Surface mPreviewSurface;
@@ -255,13 +282,30 @@ public class UVCCameraTextureView extends AspectRatioTextureView    // API >= 14
 		private boolean mIsActive = true;
 		private final FpsCounter mFpsCounter;
 
-		public static final RenderHandler createHandler(final FpsCounter counter,
-			final SurfaceTexture surface, final int width, final int height) {
-			
+
+		public static RenderHandler createHandler(final FpsCounter counter,
+												  final SurfaceTexture surface, final int width, final int height) {
+
+			Log.d(TAG, "createHandler: creating RenderThread");
 			final RenderThread thread = new RenderThread(counter, surface, width, height);
 			thread.start();
-			return thread.getHandler();
+			Log.d(TAG, "createHandler: RenderThread started");
+			RenderHandler handler = thread.getHandler();
+			if (handler == null) {
+				Log.e(TAG, "createHandler: RenderHandler is null");
+			} else {
+				Log.d(TAG, "createHandler: RenderHandler created successfully");
+			}
+			return handler;
 		}
+
+//		public static final RenderHandler createHandler(final FpsCounter counter,
+//			final SurfaceTexture surface, final int width, final int height) {
+//
+//			final RenderThread thread = new RenderThread(counter, surface, width, height);
+//			thread.start();
+//			return thread.getHandler();
+//		}
 
 		private RenderHandler(final FpsCounter counter, final RenderThread thread) {
 			mThread = thread;
@@ -278,17 +322,38 @@ public class UVCCameraTextureView extends AspectRatioTextureView    // API >= 14
 			if (DEBUG) Log.v(TAG, "getPreviewTexture:");
 			if (mIsActive) {
 				synchronized (mThread.mSync) {
+					Log.d(TAG, "getPreviewTexture: sending MSG_CREATE_SURFACE message");
 					sendEmptyMessage(MSG_CREATE_SURFACE);
 					try {
+						Log.d(TAG, "getPreviewTexture: waiting for mSync");
 						mThread.mSync.wait();
 					} catch (final InterruptedException e) {
+						Log.e(TAG, "getPreviewTexture: interrupted while waiting", e);
 					}
+					Log.d(TAG, "getPreviewTexture: mPreviewSurface = " + mThread.mPreviewSurface);
 					return mThread.mPreviewSurface;
 				}
 			} else {
+				Log.d(TAG, "getPreviewTexture: mIsActive is false");
 				return null;
 			}
 		}
+
+//		public final SurfaceTexture getPreviewTexture() {
+//			if (DEBUG) Log.v(TAG, "getPreviewTexture:");
+//			if (mIsActive) {
+//				synchronized (mThread.mSync) {
+//					sendEmptyMessage(MSG_CREATE_SURFACE);
+//					try {
+//						mThread.mSync.wait();
+//					} catch (final InterruptedException e) {
+//					}
+//					return mThread.mPreviewSurface;
+//				}
+//			} else {
+//				return null;
+//			}
+//		}
 
 		public void resize(final int width, final int height) {
 			if (DEBUG) Log.v(TAG, "resize:");
@@ -540,26 +605,46 @@ public class UVCCameraTextureView extends AspectRatioTextureView    // API >= 14
 				return bitmap;
 			} */
 
-			@Override
-			public final void run() {
-				Log.d(TAG, getName() + " started");
-	            init();
-	            Looper.prepare();
-	            synchronized (mSync) {
-	            	mHandler = new RenderHandler(mFpsCounter, this);
-	                mSync.notify();
-	            }
+//			@Override
+//			public final void run() {
+//				Log.d(TAG, getName() + " started");
+//	            init();
+//	            Looper.prepare();
+//	            synchronized (mSync) {
+//	            	mHandler = new RenderHandler(mFpsCounter, this);
+//	                mSync.notify();
+//	            }
+//
+//	            Looper.loop();
+//
+//	            Log.d(TAG, getName() + " finishing");
+//	            release();
+//	            synchronized (mSync) {
+//	                mHandler = null;
+//	                mSync.notify();
+//	            }
+//			}
+@Override
+public void run() {
+	Log.d(TAG, "RenderThread#run: initializing");
+	Log.d(TAG, getName() + " started");
+	init();
+	Looper.prepare();
+	synchronized (mSync) {
+		mHandler = new RenderHandler(mFpsCounter, this);
+		mSync.notify();
+		Log.d(TAG, "RenderThread#run: Handler created and notified");
+	}
 
-	            Looper.loop();
+	Looper.loop();
 
-	            Log.d(TAG, getName() + " finishing");
-	            release();
-	            synchronized (mSync) {
-	                mHandler = null;
-	                mSync.notify();
-	            }
-			}
-
+	Log.d(TAG, getName() + " finishing");
+	release();
+	synchronized (mSync) {
+		mHandler = null;
+		mSync.notify();
+	}
+}
 			private final void init() {
 				if (DEBUG) Log.v(TAG, "RenderThread#init:");
 				// create EGLContext for this thread

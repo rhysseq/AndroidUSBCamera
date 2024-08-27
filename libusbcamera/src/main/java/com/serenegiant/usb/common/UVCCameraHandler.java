@@ -105,14 +105,54 @@ public class UVCCameraHandler extends AbstractUVCCameraHandler {
 	 * @param bandwidthFactor
 	 * @return
 	 */
+//	public static final UVCCameraHandler createHandler(
+//			final Activity parent, final CameraViewInterface cameraView,
+//			final int encoderType, final int width, final int height, final int format, final float bandwidthFactor) {
+//
+//		final CameraThread thread = new CameraThread(UVCCameraHandler.class, parent, cameraView, encoderType, width, height, format, bandwidthFactor);
+//		thread.start();
+//		return (UVCCameraHandler)thread.getHandler();
+//	}
 	public static final UVCCameraHandler createHandler(
 			final Activity parent, final CameraViewInterface cameraView,
 			final int encoderType, final int width, final int height, final int format, final float bandwidthFactor) {
 
+		Log.d("createHandler", "Entering createHandler method");
+
+		Log.d("createHandler", "Parameters - Parent: " + parent
+				+ ", CameraViewInterface: " + cameraView
+				+ ", EncoderType: " + encoderType
+				+ ", Width: " + width
+				+ ", Height: " + height
+				+ ", Format: " + format
+				+ ", BandwidthFactor: " + bandwidthFactor);
+
 		final CameraThread thread = new CameraThread(UVCCameraHandler.class, parent, cameraView, encoderType, width, height, format, bandwidthFactor);
-		thread.start();
-		return (UVCCameraHandler)thread.getHandler();
+
+		try {
+			Log.d("createHandler", "Starting CameraThread");
+			thread.start();
+
+			Log.d("createHandler", "Retrieving handler from CameraThread");
+			UVCCameraHandler handler = (UVCCameraHandler) thread.getHandler();
+
+			if (handler != null) {
+				Log.d("createHandler", "CameraHandler created successfully: " + handler);
+			} else {
+				Log.e("createHandler", "Failed to create CameraHandler");
+			}
+
+			Log.d("createHandler", "Exiting createHandler method");
+			return handler;
+
+		} catch (Exception e) {
+			Log.e("createHandler", "Exception in creating CameraHandler", e);
+			return null;
+		}
 	}
+
+
+
 
 	protected UVCCameraHandler(final CameraThread thread) {
 		super(thread);
@@ -120,9 +160,22 @@ public class UVCCameraHandler extends AbstractUVCCameraHandler {
 
 	@Override
 	public void startPreview(final Object surface) {
+		Log.d("UVCCameraHandler", "startPreview: Surface received - " + surface);
+		if (surface == null) {
+			Log.e("UVCCameraHandler", "startPreview: Surface is null!");
+		} else {
+			Log.d("UVCCameraHandler", "startPreview: Surface is of type - " + surface.getClass().getName());
+		}
+		Log.d("SUPER PREVIEW", "SUPER PREV");
 		super.startPreview(surface);
 	}
 
+	@Override
+	public void open(USBMonitor.UsbControlBlock ctrlBlock) {
+		Log.d("OVERIDE OPEN??","OVERIDE OPEN??");
+
+		super.open(ctrlBlock);
+	}
 //	@Override
 //	public void captureStill() {
 //		super.captureStill();

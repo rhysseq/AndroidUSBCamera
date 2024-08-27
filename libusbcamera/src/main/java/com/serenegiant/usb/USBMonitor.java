@@ -61,7 +61,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-
 public final class USBMonitor {
 
 	private static final boolean DEBUG = false;	// TODO set false on production
@@ -178,12 +177,14 @@ public final class USBMonitor {
 			if (DEBUG) Log.i(TAG, "register:");
 			final Context context = mWeakContext.get();
 			if (context != null) {
-				mPermissionIntent = PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), 0);
+				mPermissionIntent = PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), PendingIntent.FLAG_IMMUTABLE);
 				final IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
 				// ACTION_USB_DEVICE_ATTACHED never comes on some devices so it should not be added here
 				filter.addAction(ACTION_USB_DEVICE_ATTACHED);
 				filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
-				context.registerReceiver(mUsbReceiver, filter);
+//				context.registerReceiver(mUsbReceiver, filter, );
+				ContextCompat.registerReceiver(
+						context, mUsbReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
 			}
 			// start connection check
 			mDeviceCounts = 0;
@@ -300,6 +301,91 @@ public final class USBMonitor {
 		return getDeviceList(mDeviceFilters);
 	}
 
+//	/**
+//	 * return device list, return empty list if no device matched
+//	 * @param filters
+//	 * @return
+//	 * @throws IllegalStateException
+//	 */
+//	public List<UsbDevice> getDeviceList(final List<DeviceFilter> filters) throws IllegalStateException {
+//		if (destroyed) throw new IllegalStateException("already destroyed");
+//		// get detected devices
+//		final HashMap<String, UsbDevice> deviceList = mUsbManager.getDeviceList();
+//		// store those devices info before matching filter xml file
+////		String fileName = Environment.getExternalStorageDirectory().getAbsolutePath()+ "/USBCamera/failed_devices.txt";
+//
+////		File logFile = new File(fileName);
+////		if(!logFile.getParentFile().exists()) {
+////			logFile.getParentFile().mkdirs();
+////		}
+////
+////		if(! logFile.exists()) {
+////			try {
+////				logFile.createNewFile();
+////			} catch (IOException e) {
+////				e.printStackTrace();
+////			}
+////		}
+////		FileWriter fw = null;
+////		PrintWriter pw = null;
+////		try {
+////			fw = new FileWriter(logFile, true);
+////		} catch (IOException e) {
+////			e.printStackTrace();
+////		}
+////		if(fw != null) {
+////			pw = new PrintWriter(fw);
+////		}
+//		final List<UsbDevice> result = new ArrayList<UsbDevice>();
+//		if (deviceList != null) {
+//			if ((filters == null) || filters.isEmpty()) {
+//				result.addAll(deviceList.values());
+//			} else {
+//				for (final UsbDevice device: deviceList.values() ) {
+//					// match devices
+//					for (final DeviceFilter filter: filters) {
+//						if ((filter != null) && filter.matches(device) || (filter != null && filter.mSubclass == device.getDeviceSubclass())) {
+//							// when filter matches
+//							if (!filter.isExclude) {
+//								result.add(device);
+//							}
+//							break;
+//						} else {
+//							// collection failed dev's class and subclass
+//							String devModel = android.os.Build.MODEL;
+//							String devSystemVersion = android.os.Build.VERSION.RELEASE;
+//							String devClass = String.valueOf(device.getDeviceClass());
+//							String subClass = String.valueOf(device.getDeviceSubclass());
+//                            Log.d("FILE WRITE ","$devModel");
+////								if(pw != null) {
+////									StringBuilder sb = new StringBuilder();
+////									sb.append(devModel);
+////									sb.append("/");
+////									sb.append(devSystemVersion);
+////									sb.append(":");
+////									sb.append("class="+devClass+", subclass="+subClass);
+////									pw.println(sb.toString());
+////									pw.flush();
+////									fw.flush();
+////								}
+//                        }
+//					}
+//				}
+//			}
+//		}
+//		if (pw != null) {
+//			pw.close();
+//		}
+//		if (fw != null) {
+//			try {
+//				fw.close();
+//			} catch (IOException e) {
+//				e.printStackTrace();
+//			}
+//		}
+//		return result;
+//	}
+
 	/**
 	 * return device list, return empty list if no device matched
 	 * @param filters
@@ -310,31 +396,7 @@ public final class USBMonitor {
 		if (destroyed) throw new IllegalStateException("already destroyed");
 		// get detected devices
 		final HashMap<String, UsbDevice> deviceList = mUsbManager.getDeviceList();
-		// store those devices info before matching filter xml file
-		String fileName = Environment.getExternalStorageDirectory().getAbsolutePath()+ "/USBCamera/failed_devices.txt";
 
-		File logFile = new File(fileName);
-		if(!logFile.getParentFile().exists()) {
-			logFile.getParentFile().mkdirs();
-		}
-
-		if(! logFile.exists()) {
-			try {
-				logFile.createNewFile();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-		FileWriter fw = null;
-		PrintWriter pw = null;
-		try {
-			fw = new FileWriter(logFile, true);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		if(fw != null) {
-			pw = new PrintWriter(fw);
-		}
 		final List<UsbDevice> result = new ArrayList<UsbDevice>();
 		if (deviceList != null) {
 			if ((filters == null) || filters.isEmpty()) {
@@ -355,38 +417,20 @@ public final class USBMonitor {
 							String devSystemVersion = android.os.Build.VERSION.RELEASE;
 							String devClass = String.valueOf(device.getDeviceClass());
 							String subClass = String.valueOf(device.getDeviceSubclass());
-							try{
-								if(pw != null) {
-									StringBuilder sb = new StringBuilder();
-									sb.append(devModel);
-									sb.append("/");
-									sb.append(devSystemVersion);
-									sb.append(":");
-									sb.append("class="+devClass+", subclass="+subClass);
-									pw.println(sb.toString());
-									pw.flush();
-									fw.flush();
-								}
-							}catch (IOException e) {
-								e.printStackTrace();
-							}
+
+							// Log device information
+							Log.d("USB_DEVICE", "Model: " + devModel);
+							Log.d("USB_DEVICE", "System Version: " + devSystemVersion);
+							Log.d("USB_DEVICE", "Class: " + devClass);
+							Log.d("USB_DEVICE", "Subclass: " + subClass);
 						}
 					}
 				}
 			}
 		}
-		if (pw != null) {
-			pw.close();
-		}
-		if (fw != null) {
-			try {
-				fw.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
 		return result;
 	}
+
 
 	/**
 	 * return device list, return empty list if no device matched
@@ -485,34 +529,46 @@ public final class USBMonitor {
 	 * @return true if fail to request permission
 	 */
 	public synchronized boolean requestPermission(final UsbDevice device) {
-//		if (DEBUG) Log.v(TAG, "requestPermission:device=" + device);
+		Log.d("USB_DEBUG", "requestPermission called for device: " + (device == null ? "null" : device.toString()));
 		boolean result = false;
+
 		if (isRegistered()) {
+			Log.d("USB_DEBUG", "USB Monitor is registered");
+
 			if (device != null) {
+				Log.d("USB_DEBUG", "Device is not null");
+
 				if (mUsbManager.hasPermission(device)) {
+					Log.d("USB_DEBUG", "App already has permission for device");
 					// call onConnect if app already has permission
 					processConnect(device);
 				} else {
 					try {
+						Log.d("USB_DEBUG", "Requesting permission for device");
 						// パーミッションがなければ要求する
 						mUsbManager.requestPermission(device, mPermissionIntent);
 					} catch (final Exception e) {
 						// Android5.1.xのGALAXY系でandroid.permission.sec.MDM_APP_MGMTという意味不明の例外生成するみたい
-						Log.w(TAG, e);
+						Log.w("USB_DEBUG", "Exception while requesting permission", e);
 						processCancel(device);
 						result = true;
 					}
 				}
 			} else {
+				Log.d("USB_DEBUG", "Device is null, processing cancel");
 				processCancel(device);
 				result = true;
 			}
 		} else {
+			Log.d("USB_DEBUG", "USB Monitor is not registered, processing cancel");
 			processCancel(device);
 			result = true;
 		}
+
+		Log.d("USB_DEBUG", "requestPermission result: " + result);
 		return result;
 	}
+
 
 	/**
 	 * 指定したUsbDeviceをopenする
@@ -620,28 +676,38 @@ public final class USBMonitor {
 	 * @param device
 	 */
 	private final void processConnect(final UsbDevice device) {
-		if (destroyed) return;
+		if (destroyed) {
+			Log.d(TAG, "processConnect: Device is destroyed, cannot connect.");
+			return;
+		}
+		Log.d(TAG, "processConnect: Updating permission for device " + device);
 		updatePermission(device, true);
 		mAsyncHandler.post(new Runnable() {
 			@Override
 			public void run() {
+				Log.d(TAG, "processConnect: Running on async handler for device " + device);
 				if (DEBUG) Log.v(TAG, "processConnect:device=" + device);
 				UsbControlBlock ctrlBlock;
 				final boolean createNew;
+				Log.d(TAG, "processConnect: Checking control block for device " + device);
 				ctrlBlock = mCtrlBlocks.get(device);
 				if (ctrlBlock == null) {
+					Log.d(TAG, "processConnect: Creating new control block for device " + device);
 					ctrlBlock = new UsbControlBlock(USBMonitor.this, device);
 					mCtrlBlocks.put(device, ctrlBlock);
 					createNew = true;
 				} else {
+					Log.d(TAG, "processConnect: Reusing existing control block for device " + device);
 					createNew = false;
 				}
 				if (mOnDeviceConnectListener != null) {
+					Log.d(TAG, "processConnect: Notifying device connect listener for device " + device);
 					mOnDeviceConnectListener.onConnect(device, ctrlBlock, createNew);
 				}
 			}
 		});
 	}
+
 
 	private final void processCancel(final UsbDevice device) {
 		if (destroyed) return;
