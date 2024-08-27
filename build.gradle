@@ -45,7 +45,7 @@ buildscript {
         mavenCentral() // Replaced jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.4.0'
+        classpath 'com.android.tools.build:gradle:7.4.2'
         // classpath 'com.github.dcendents:android-maven-gradle-plugin:2.1' // If necessary, otherwise consider removing
     }
 }
